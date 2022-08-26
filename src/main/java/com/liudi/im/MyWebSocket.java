@@ -28,13 +28,14 @@ public class MyWebSocket {
     //与某个客户端的连接会话，需要通过它来给客户端发送数据
     private Session session;
 
-    //用以记录用户和房间号的对应关系(sessionId,room)
+    //用以记录会话和房间号的对应关系(sessionId,room)
+    //[(0,1),(1,1),(2,1)]
     private static HashMap<String,String> RoomForUser = new HashMap<String,String>();
 
     //用以记录房间和其中用户群的对应关系(room,List<用户>)
     public static HashMap<String,CopyOnWriteArraySet<User>> UserForRoom = new HashMap<String,CopyOnWriteArraySet<User>>();
 
-    //用以记录房间和其中用户群的对应关系(room,List<用户>)
+    //用以记录房间和房间密码的对应关系(room,password)
     public static HashMap<String,String> PwdForRoom = new HashMap<String,String>();
 
     //用来存放必应壁纸
@@ -47,6 +48,9 @@ public class MyWebSocket {
     /**
      * 连接建立成功调用的方法
      * @param session
+     *
+     * 客户端和服务器建立第一次连接组织发送连接消息给客户端
+     * 这里事先从必应上下载了图片，随机挑选一个图片链接给客户端
      */
     @OnOpen
     public void onOpen(Session session) throws IOException {
@@ -63,6 +67,11 @@ public class MyWebSocket {
 
     /**
      * 连接关闭调用的方法
+     *
+     * 找到当前连接的房间，并找到该房间里的所有的人
+     * 给该房间里的所有人发离开的用户关闭连接的消息
+     * 移除<连接>-<房间>这个关系记录
+     * 如果房间里的人都离线了，则同时移除<房间>-<用户列表>这个关系记录、<房间>-<密码>这个关系记录
      */
     @OnClose
     public void onClose() {
@@ -93,6 +102,8 @@ public class MyWebSocket {
 
     /**
      * 收到客户端消息后调用的方法
+     *
+     * 根据收到消息的不同，做不同的处理
      * @param message 消息内容
      * @param session
      */
@@ -152,6 +163,9 @@ public class MyWebSocket {
 
     /**
      * 连接发生错误时的调用方法
+     *
+     * 给其他处于同一个房间的用户发送提示消息，从该连接对应的用户列表移除断开的用户、<连接>-<房间>这个关系记录
+     * 如果房间里的人都离线了，则同时移除<房间>-<用户列表>这个关系记录、<房间>-<密码>这个关系记录
      * @param session
      * @param error
      */
@@ -264,9 +278,10 @@ public class MyWebSocket {
     }
 
     /**
-     * 给某个房间除自己外发送消息
+     * 给某个房间除自己、指定会话的连接外发送消息
      * @param users
      * @param message
+     * @param shiel 需要屏蔽的会话id列表
      */
     private void sendMessagesOther(CopyOnWriteArraySet<User> users, String message, String shiel){
         List<String> shiels = Arrays.asList(shiel.split(","));
